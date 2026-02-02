@@ -6,14 +6,12 @@
   <title>BIOMETRIC ANALYSIS SYSTEM</title>
   <script src="lib/face-api.min.js"></script>
   <style>
-    @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap');
-
     * { margin: 0; padding: 0; box-sizing: border-box; }
 
     body {
       background: #0a0a0a;
       min-height: 100vh;
-      font-family: 'Share Tech Mono', 'Courier New', monospace;
+      font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
       color: #0f0;
       overflow: hidden;
     }
@@ -693,7 +691,7 @@
       ctx.stroke();
 
       // Label
-      ctx.font = 'bold 11px Share Tech Mono, monospace';
+      ctx.font = 'bold 11px Consolas, monospace';
       ctx.fillStyle = '#00ff00';
       ctx.shadowColor = '#00ff00';
       ctx.shadowBlur = 10;
@@ -701,7 +699,7 @@
       ctx.shadowBlur = 0;
 
       // Coords
-      ctx.font = '9px Share Tech Mono, monospace';
+      ctx.font = '9px Consolas, monospace';
       ctx.fillStyle = 'rgba(0, 255, 0, 0.7)';
       ctx.fillText(`X:${Math.floor(cx)} Y:${Math.floor(cy)}`, box.x, box.y + box.height + 15);
     }
@@ -714,6 +712,13 @@
         log('WARNING: Camera requires HTTPS or localhost', 'warning');
         log('Current: ' + location.protocol + '//' + location.hostname, 'warning');
       }
+
+      document.getElementById('mainStatus').textContent = 'INITIALIZING TENSORFLOW...';
+      log('Initializing TensorFlow backend...', 'info');
+
+      // Attendre que TensorFlow soit prêt
+      await faceapi.tf.ready();
+      log('TensorFlow ready: ' + faceapi.tf.getBackend(), 'success');
 
       document.getElementById('mainStatus').textContent = 'LOADING NEURAL NETWORK...';
 

@@ -1,0 +1,781 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BIOMETRIC ANALYSIS SYSTEM</title>
+  <script src="lib/face-api.min.js"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap');
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      background: #0a0a0a;
+      min-height: 100vh;
+      font-family: 'Share Tech Mono', 'Courier New', monospace;
+      color: #0f0;
+      overflow: hidden;
+    }
+
+    .main-container {
+      display: flex;
+      height: 100vh;
+      padding: 10px;
+      gap: 10px;
+    }
+
+    .video-section {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .video-container {
+      position: relative;
+      border: 1px solid #0f0;
+      box-shadow: 0 0 20px rgba(0, 255, 0, 0.2), inset 0 0 20px rgba(0, 255, 0, 0.05);
+    }
+
+    #video { display: block; transform: scaleX(-1); width: 100%; }
+    #canvas { position: absolute; top: 0; left: 0; transform: scaleX(-1); width: 100%; height: 100%; }
+
+    .scanline {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 2px;
+      background: linear-gradient(90deg, transparent, #0f0, transparent);
+      opacity: 0.7;
+      animation: scanline 3s linear infinite;
+    }
+
+    @keyframes scanline {
+      0% { top: 0; }
+      100% { top: 100%; }
+    }
+
+    .corner-overlay {
+      position: absolute;
+      width: 50px;
+      height: 50px;
+      border-color: #0f0;
+      border-style: solid;
+      border-width: 0;
+    }
+    .corner-overlay.tl { top: 10px; left: 10px; border-top-width: 2px; border-left-width: 2px; }
+    .corner-overlay.tr { top: 10px; right: 10px; border-top-width: 2px; border-right-width: 2px; }
+    .corner-overlay.bl { bottom: 10px; left: 10px; border-bottom-width: 2px; border-left-width: 2px; }
+    .corner-overlay.br { bottom: 10px; right: 10px; border-bottom-width: 2px; border-right-width: 2px; }
+
+    .status-bar {
+      position: absolute;
+      top: 10px;
+      left: 70px;
+      font-size: 12px;
+      text-shadow: 0 0 10px #0f0;
+    }
+
+    .timestamp {
+      position: absolute;
+      bottom: 10px;
+      right: 70px;
+      font-size: 11px;
+      color: #0f0;
+    }
+
+    .side-panel {
+      width: 320px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      overflow: hidden;
+    }
+
+    .panel {
+      border: 1px solid #0f03;
+      background: rgba(0, 20, 0, 0.8);
+      padding: 10px;
+      font-size: 11px;
+    }
+
+    .panel-title {
+      color: #0f0;
+      border-bottom: 1px solid #0f03;
+      padding-bottom: 5px;
+      margin-bottom: 8px;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+    }
+
+    .terminal {
+      flex: 1;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .terminal-content {
+      height: 150px;
+      overflow-y: auto;
+      font-size: 10px;
+      line-height: 1.4;
+    }
+
+    .terminal-content::-webkit-scrollbar { width: 3px; }
+    .terminal-content::-webkit-scrollbar-track { background: #001100; }
+    .terminal-content::-webkit-scrollbar-thumb { background: #0f0; }
+
+    .log-entry { margin: 2px 0; opacity: 0.9; }
+    .log-entry.warning { color: #ff0; }
+    .log-entry.error { color: #f00; }
+    .log-entry.success { color: #0ff; }
+    .log-entry.info { color: #0f0; }
+
+    .data-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 5px;
+    }
+
+    .data-item {
+      background: rgba(0, 40, 0, 0.5);
+      padding: 5px;
+      border-left: 2px solid #0f03;
+    }
+
+    .data-label { color: #070; font-size: 9px; text-transform: uppercase; }
+    .data-value { color: #0f0; font-size: 12px; margin-top: 2px; }
+
+    .progress-bar {
+      height: 4px;
+      background: #001100;
+      margin-top: 5px;
+      overflow: hidden;
+    }
+
+    .progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #0f0, #0ff);
+      transition: width 0.3s;
+    }
+
+    .biometric-data {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .bio-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .bio-bar {
+      width: 60%;
+      height: 8px;
+      background: #001100;
+      position: relative;
+    }
+
+    .bio-fill {
+      height: 100%;
+      background: #0f0;
+      transition: width 0.5s;
+    }
+
+    .alert-box {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: rgba(0, 20, 0, 0.95);
+      border: 2px solid #0f0;
+      padding: 20px 40px;
+      text-align: center;
+      z-index: 100;
+      display: none;
+      animation: alertPulse 0.5s ease-in-out;
+    }
+
+    @keyframes alertPulse {
+      0%, 100% { box-shadow: 0 0 20px #0f0; }
+      50% { box-shadow: 0 0 40px #0f0, 0 0 60px #0f0; }
+    }
+
+    .alert-box.warning { border-color: #ff0; }
+    .alert-box.warning .alert-text { color: #ff0; }
+
+    .hex-display {
+      font-size: 9px;
+      color: #050;
+      word-break: break-all;
+      line-height: 1.2;
+      max-height: 40px;
+      overflow: hidden;
+    }
+
+    .matrix-bg {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      opacity: 0.03;
+      z-index: -1;
+      background: repeating-linear-gradient(
+        0deg,
+        #0f0 0px,
+        transparent 1px,
+        transparent 2px
+      );
+    }
+
+    .bottom-bar {
+      display: flex;
+      gap: 10px;
+    }
+
+    .mini-panel {
+      flex: 1;
+      border: 1px solid #0f03;
+      background: rgba(0, 20, 0, 0.8);
+      padding: 8px;
+      font-size: 10px;
+    }
+
+    .wave-container {
+      height: 30px;
+      display: flex;
+      align-items: center;
+      gap: 1px;
+    }
+
+    .wave-bar {
+      width: 3px;
+      background: #0f0;
+      animation: wave 0.5s ease-in-out infinite;
+    }
+
+    @keyframes wave {
+      0%, 100% { height: 5px; }
+      50% { height: 25px; }
+    }
+
+    .threat-level {
+      display: flex;
+      gap: 3px;
+      margin-top: 5px;
+    }
+
+    .threat-block {
+      width: 20px;
+      height: 10px;
+      background: #001100;
+      transition: background 0.3s;
+    }
+
+    .threat-block.active { background: #0f0; }
+    .threat-block.warning { background: #ff0; }
+    .threat-block.danger { background: #f00; }
+
+    .typing-cursor {
+      animation: blink 0.7s infinite;
+    }
+
+    @keyframes blink {
+      0%, 50% { opacity: 1; }
+      51%, 100% { opacity: 0; }
+    }
+
+    .glitch {
+      animation: glitch 0.3s ease-in-out;
+    }
+
+    @keyframes glitch {
+      0%, 100% { transform: translate(0); filter: hue-rotate(0deg); }
+      25% { transform: translate(-2px, 2px); filter: hue-rotate(90deg); }
+      50% { transform: translate(2px, -2px); filter: hue-rotate(180deg); }
+      75% { transform: translate(-2px, -2px); filter: hue-rotate(270deg); }
+    }
+  </style>
+</head>
+<body>
+  <div class="matrix-bg"></div>
+
+  <div class="main-container">
+    <div class="video-section">
+      <div class="video-container">
+        <video id="video" autoplay playsinline></video>
+        <canvas id="canvas"></canvas>
+        <div class="scanline"></div>
+        <div class="corner-overlay tl"></div>
+        <div class="corner-overlay tr"></div>
+        <div class="corner-overlay bl"></div>
+        <div class="corner-overlay br"></div>
+        <div class="status-bar">
+          <div id="mainStatus">INITIALIZING SYSTEM...</div>
+          <div id="subStatus" style="color: #070; font-size: 10px;"></div>
+        </div>
+        <div class="timestamp" id="timestamp"></div>
+      </div>
+
+      <div class="bottom-bar">
+        <div class="mini-panel">
+          <div style="color: #070;">SIGNAL ANALYSIS</div>
+          <div class="wave-container" id="waveform"></div>
+        </div>
+        <div class="mini-panel">
+          <div style="color: #070;">THREAT ASSESSMENT</div>
+          <div class="threat-level" id="threatLevel"></div>
+          <div id="threatStatus" style="margin-top: 5px;">EVALUATING...</div>
+        </div>
+        <div class="mini-panel">
+          <div style="color: #070;">ENCRYPTION</div>
+          <div class="hex-display" id="hexDisplay"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="side-panel">
+      <div class="panel">
+        <div class="panel-title">◢ Biometric Analysis</div>
+        <div class="biometric-data">
+          <div class="bio-item">
+            <span class="data-label">Face Match</span>
+            <div class="bio-bar"><div class="bio-fill" id="bioFace" style="width: 0%"></div></div>
+            <span id="bioFaceVal">---%</span>
+          </div>
+          <div class="bio-item">
+            <span class="data-label">Identity</span>
+            <div class="bio-bar"><div class="bio-fill" id="bioId" style="width: 0%"></div></div>
+            <span id="bioIdVal">---%</span>
+          </div>
+          <div class="bio-item">
+            <span class="data-label">Confidence</span>
+            <div class="bio-bar"><div class="bio-fill" id="bioConf" style="width: 0%"></div></div>
+            <span id="bioConfVal">---%</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-title">◢ Subject Data</div>
+        <div class="data-grid">
+          <div class="data-item">
+            <div class="data-label">Subject ID</div>
+            <div class="data-value" id="subjectId">SCANNING...</div>
+          </div>
+          <div class="data-item">
+            <div class="data-label">Status</div>
+            <div class="data-value" id="subjectStatus">UNKNOWN</div>
+          </div>
+          <div class="data-item">
+            <div class="data-label">Clearance</div>
+            <div class="data-value" id="clearance">PENDING</div>
+          </div>
+          <div class="data-item">
+            <div class="data-label">Threat</div>
+            <div class="data-value" id="threatVal">ANALYZING</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-title">◢ Database Query</div>
+        <div id="dbStatus">Connecting to secure server...</div>
+        <div class="progress-bar">
+          <div class="progress-fill" id="dbProgress" style="width: 0%"></div>
+        </div>
+        <div id="dbInfo" style="margin-top: 8px; font-size: 9px; color: #070;"></div>
+      </div>
+
+      <div class="panel terminal">
+        <div class="panel-title">◢ System Log</div>
+        <div class="terminal-content" id="terminal"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="alert-box" id="alertBox">
+    <div class="alert-text" id="alertText"></div>
+  </div>
+
+  <script>
+    const video = document.getElementById('video');
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+
+    let currentBox = null;
+    let faceDetected = false;
+    const SMOOTHING = 0.2;
+
+    // Terminal logging
+    const terminal = document.getElementById('terminal');
+    function log(msg, type = 'info') {
+      const entry = document.createElement('div');
+      entry.className = `log-entry ${type}`;
+      const time = new Date().toLocaleTimeString('en-US', { hour12: false });
+      entry.innerHTML = `[${time}] ${msg}`;
+      terminal.appendChild(entry);
+      terminal.scrollTop = terminal.scrollHeight;
+    }
+
+    // Timestamp update
+    function updateTimestamp() {
+      const now = new Date();
+      document.getElementById('timestamp').textContent =
+        now.toLocaleString('en-US', { hour12: false }) + '.' + now.getMilliseconds().toString().padStart(3, '0');
+    }
+    setInterval(updateTimestamp, 50);
+
+    // Waveform
+    const waveform = document.getElementById('waveform');
+    for (let i = 0; i < 40; i++) {
+      const bar = document.createElement('div');
+      bar.className = 'wave-bar';
+      bar.style.animationDelay = `${i * 0.05}s`;
+      waveform.appendChild(bar);
+    }
+
+    // Threat level blocks
+    const threatLevel = document.getElementById('threatLevel');
+    for (let i = 0; i < 10; i++) {
+      const block = document.createElement('div');
+      block.className = 'threat-block';
+      threatLevel.appendChild(block);
+    }
+
+    // Hex display
+    function updateHex() {
+      let hex = '';
+      for (let i = 0; i < 80; i++) {
+        hex += Math.floor(Math.random() * 16).toString(16).toUpperCase();
+      }
+      document.getElementById('hexDisplay').textContent = hex;
+    }
+    setInterval(updateHex, 100);
+
+    // Random system messages
+    const systemMessages = [
+      { msg: 'Analyzing facial geometry...', type: 'info' },
+      { msg: 'Cross-referencing biometric database...', type: 'info' },
+      { msg: 'Scanning retinal patterns...', type: 'info' },
+      { msg: 'Verifying identity markers...', type: 'info' },
+      { msg: 'Processing neural signature...', type: 'info' },
+      { msg: 'Checking security clearance...', type: 'warning' },
+      { msg: 'Establishing secure connection...', type: 'info' },
+      { msg: 'Decrypting biometric data...', type: 'info' },
+      { msg: 'Running facial recognition algorithm...', type: 'info' },
+      { msg: 'Matching bone structure patterns...', type: 'info' },
+      { msg: 'Analyzing micro-expressions...', type: 'info' },
+      { msg: 'WARNING: Anomaly detected in sector 7', type: 'warning' },
+      { msg: 'Validating authentication tokens...', type: 'info' },
+      { msg: 'Querying INTERPOL database...', type: 'warning' },
+      { msg: 'Syncing with satellite network...', type: 'info' },
+      { msg: 'Processing thermal signature...', type: 'info' },
+      { msg: 'Calculating threat probability...', type: 'info' },
+      { msg: 'Updating subject profile...', type: 'success' },
+      { msg: 'Encrypting transmission channel...', type: 'info' },
+      { msg: 'Connection secured: AES-256', type: 'success' },
+    ];
+
+    function randomLog() {
+      if (faceDetected) {
+        const msg = systemMessages[Math.floor(Math.random() * systemMessages.length)];
+        log(msg.msg, msg.type);
+      }
+      setTimeout(randomLog, Math.random() * 2000 + 500);
+    }
+    setTimeout(randomLog, 2000);
+
+    // Database progress simulation
+    let dbProgress = 0;
+    const dbMessages = [
+      'Connecting to secure server...',
+      'Authenticating credentials...',
+      'Establishing encrypted tunnel...',
+      'Querying primary database...',
+      'Fetching biometric records...',
+      'Cross-referencing entries...',
+      'Validating data integrity...',
+      'Compiling results...',
+      'Analysis complete'
+    ];
+
+    function updateDbProgress() {
+      if (faceDetected && dbProgress < 100) {
+        dbProgress += Math.random() * 15;
+        if (dbProgress > 100) dbProgress = 100;
+        document.getElementById('dbProgress').style.width = dbProgress + '%';
+        const msgIndex = Math.min(Math.floor(dbProgress / 12), dbMessages.length - 1);
+        document.getElementById('dbStatus').textContent = dbMessages[msgIndex];
+
+        if (dbProgress >= 100) {
+          document.getElementById('dbInfo').innerHTML =
+            `Records scanned: ${Math.floor(Math.random() * 50000 + 10000).toLocaleString()}<br>` +
+            `Match found: ${Math.random() > 0.5 ? 'POSITIVE' : 'ANALYZING'}`;
+          log('Database query completed', 'success');
+        }
+      } else if (!faceDetected) {
+        dbProgress = 0;
+        document.getElementById('dbProgress').style.width = '0%';
+        document.getElementById('dbStatus').textContent = 'Awaiting target...';
+        document.getElementById('dbInfo').innerHTML = '';
+      }
+      setTimeout(updateDbProgress, Math.random() * 500 + 200);
+    }
+    updateDbProgress();
+
+    // Biometric bars
+    function updateBiometrics() {
+      if (faceDetected) {
+        const face = Math.min(95, Math.random() * 20 + 75);
+        const id = Math.min(90, Math.random() * 30 + 50);
+        const conf = Math.min(98, Math.random() * 15 + 80);
+
+        document.getElementById('bioFace').style.width = face + '%';
+        document.getElementById('bioFaceVal').textContent = face.toFixed(1) + '%';
+        document.getElementById('bioId').style.width = id + '%';
+        document.getElementById('bioIdVal').textContent = id.toFixed(1) + '%';
+        document.getElementById('bioConf').style.width = conf + '%';
+        document.getElementById('bioConfVal').textContent = conf.toFixed(1) + '%';
+      } else {
+        ['bioFace', 'bioId', 'bioConf'].forEach(id => {
+          document.getElementById(id).style.width = '0%';
+        });
+        ['bioFaceVal', 'bioIdVal', 'bioConfVal'].forEach(id => {
+          document.getElementById(id).textContent = '---%';
+        });
+      }
+      setTimeout(updateBiometrics, Math.random() * 1000 + 500);
+    }
+    updateBiometrics();
+
+    // Subject data
+    function generateSubjectId() {
+      return 'SBJ-' + Math.random().toString(36).substring(2, 8).toUpperCase();
+    }
+
+    function updateSubjectData() {
+      if (faceDetected) {
+        document.getElementById('subjectId').textContent = generateSubjectId();
+        document.getElementById('subjectStatus').textContent = ['TRACKING', 'IDENTIFIED', 'ANALYZING'][Math.floor(Math.random() * 3)];
+        document.getElementById('clearance').textContent = ['LEVEL-1', 'LEVEL-2', 'PENDING', 'DENIED'][Math.floor(Math.random() * 4)];
+        document.getElementById('threatVal').textContent = ['LOW', 'MINIMAL', 'MODERATE'][Math.floor(Math.random() * 3)];
+
+        // Update threat blocks
+        const blocks = document.querySelectorAll('.threat-block');
+        const level = Math.floor(Math.random() * 4) + 1;
+        blocks.forEach((block, i) => {
+          block.className = 'threat-block';
+          if (i < level) block.classList.add('active');
+        });
+        document.getElementById('threatStatus').textContent = 'LEVEL ' + level + ' - MINIMAL THREAT';
+      } else {
+        document.getElementById('subjectId').textContent = 'NO TARGET';
+        document.getElementById('subjectStatus').textContent = 'SCANNING';
+        document.getElementById('clearance').textContent = '---';
+        document.getElementById('threatVal').textContent = '---';
+        document.querySelectorAll('.threat-block').forEach(b => b.className = 'threat-block');
+        document.getElementById('threatStatus').textContent = 'NO TARGET DETECTED';
+      }
+      setTimeout(updateSubjectData, Math.random() * 2000 + 1000);
+    }
+    updateSubjectData();
+
+    // Alert system
+    function showAlert(text, type = '') {
+      const box = document.getElementById('alertBox');
+      const alertText = document.getElementById('alertText');
+      box.className = 'alert-box ' + type;
+      alertText.textContent = text;
+      box.style.display = 'block';
+      setTimeout(() => box.style.display = 'none', 2000);
+    }
+
+    // Random alerts
+    function randomAlert() {
+      if (faceDetected && Math.random() > 0.7) {
+        const alerts = [
+          { text: '◢ TARGET ACQUIRED ◣', type: '' },
+          { text: '◢ BIOMETRIC MATCH FOUND ◣', type: '' },
+          { text: '◢ IDENTITY CONFIRMED ◣', type: '' },
+          { text: '⚠ SCANNING COMPLETE ⚠', type: 'warning' },
+        ];
+        const alert = alerts[Math.floor(Math.random() * alerts.length)];
+        showAlert(alert.text, alert.type);
+      }
+      setTimeout(randomAlert, Math.random() * 8000 + 5000);
+    }
+    setTimeout(randomAlert, 5000);
+
+    // Face tracking
+    function lerp(a, b, t) { return a + (b - a) * t; }
+
+    function smoothBox(target) {
+      if (!currentBox) {
+        currentBox = { ...target };
+        return currentBox;
+      }
+      currentBox.x = lerp(currentBox.x, target.x, SMOOTHING);
+      currentBox.y = lerp(currentBox.y, target.y, SMOOTHING);
+      currentBox.width = lerp(currentBox.width, target.width, SMOOTHING);
+      currentBox.height = lerp(currentBox.height, target.height, SMOOTHING);
+      return currentBox;
+    }
+
+    function drawTrackingBox(box) {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      const cornerLength = 30;
+      ctx.strokeStyle = '#00ff00';
+      ctx.lineWidth = 2;
+      ctx.shadowColor = '#00ff00';
+      ctx.shadowBlur = 15;
+
+      // Corners
+      ctx.beginPath();
+      ctx.moveTo(box.x, box.y + cornerLength);
+      ctx.lineTo(box.x, box.y);
+      ctx.lineTo(box.x + cornerLength, box.y);
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.moveTo(box.x + box.width - cornerLength, box.y);
+      ctx.lineTo(box.x + box.width, box.y);
+      ctx.lineTo(box.x + box.width, box.y + cornerLength);
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.moveTo(box.x + box.width, box.y + box.height - cornerLength);
+      ctx.lineTo(box.x + box.width, box.y + box.height);
+      ctx.lineTo(box.x + box.width - cornerLength, box.y + box.height);
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.moveTo(box.x + cornerLength, box.y + box.height);
+      ctx.lineTo(box.x, box.y + box.height);
+      ctx.lineTo(box.x, box.y + box.height - cornerLength);
+      ctx.stroke();
+
+      // Dashed lines
+      ctx.shadowBlur = 0;
+      ctx.setLineDash([5, 10]);
+      ctx.lineWidth = 1;
+      ctx.strokeStyle = 'rgba(0, 255, 0, 0.4)';
+      ctx.strokeRect(box.x, box.y, box.width, box.height);
+      ctx.setLineDash([]);
+
+      // Center crosshair
+      const cx = box.x + box.width / 2;
+      const cy = box.y + box.height / 2;
+      ctx.strokeStyle = 'rgba(0, 255, 0, 0.6)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(cx - 15, cy);
+      ctx.lineTo(cx - 5, cy);
+      ctx.moveTo(cx + 5, cy);
+      ctx.lineTo(cx + 15, cy);
+      ctx.moveTo(cx, cy - 15);
+      ctx.lineTo(cx, cy - 5);
+      ctx.moveTo(cx, cy + 5);
+      ctx.lineTo(cx, cy + 15);
+      ctx.stroke();
+
+      // Small circle at center
+      ctx.beginPath();
+      ctx.arc(cx, cy, 3, 0, Math.PI * 2);
+      ctx.stroke();
+
+      // Label
+      ctx.font = 'bold 11px Share Tech Mono, monospace';
+      ctx.fillStyle = '#00ff00';
+      ctx.shadowColor = '#00ff00';
+      ctx.shadowBlur = 10;
+      ctx.fillText('◢ TARGET LOCKED ◣', box.x, box.y - 10);
+      ctx.shadowBlur = 0;
+
+      // Coords
+      ctx.font = '9px Share Tech Mono, monospace';
+      ctx.fillStyle = 'rgba(0, 255, 0, 0.7)';
+      ctx.fillText(`X:${Math.floor(cx)} Y:${Math.floor(cy)}`, box.x, box.y + box.height + 15);
+    }
+
+    async function init() {
+      log('System initialization...', 'info');
+      document.getElementById('mainStatus').textContent = 'LOADING NEURAL NETWORK...';
+
+      await faceapi.nets.tinyFaceDetector.loadFromUri('/models');
+      log('Neural network loaded', 'success');
+
+      document.getElementById('mainStatus').textContent = 'ACCESSING CAMERA...';
+      log('Requesting camera access...', 'info');
+
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { width: 800, height: 600, facingMode: 'user' }
+      });
+      video.srcObject = stream;
+      await video.play();
+
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+
+      log('Camera online', 'success');
+      log('Initiating biometric scan protocol...', 'info');
+      document.getElementById('mainStatus').textContent = '◢ SCANNING ◣';
+      document.getElementById('subStatus').textContent = 'Awaiting target acquisition...';
+
+      showAlert('◢ SYSTEM ONLINE ◣');
+
+      async function detect() {
+        const detection = await faceapi.detectSingleFace(video, new faceapi.TinyFaceDetectorOptions());
+
+        if (detection) {
+          if (!faceDetected) {
+            faceDetected = true;
+            log('Target acquired!', 'success');
+            document.getElementById('mainStatus').textContent = '◢ TARGET LOCKED ◣';
+            document.getElementById('subStatus').textContent = 'Biometric analysis in progress...';
+            showAlert('◢ TARGET ACQUIRED ◣');
+          }
+
+          const box = detection.box;
+          const padding = 40;
+          const target = {
+            x: box.x - padding,
+            y: box.y - padding,
+            width: box.width + padding * 2,
+            height: box.height + padding * 2
+          };
+          drawTrackingBox(smoothBox(target));
+        } else {
+          if (faceDetected) {
+            faceDetected = false;
+            log('Target lost', 'warning');
+            document.getElementById('mainStatus').textContent = '◢ SCANNING ◣';
+            document.getElementById('subStatus').textContent = 'Target lost - reacquiring...';
+            dbProgress = 0;
+          }
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+          currentBox = null;
+        }
+
+        requestAnimationFrame(detect);
+      }
+
+      detect();
+    }
+
+    init().catch(err => {
+      console.error(err);
+      log('CRITICAL ERROR: ' + err.message, 'error');
+      document.getElementById('mainStatus').textContent = 'ERROR';
+    });
+  </script>
+</body>
+</html>

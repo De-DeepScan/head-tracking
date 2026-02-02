@@ -1,0 +1,13 @@
+{
+  "name": "face-tracking-node",
+  "version": "1.0.0",
+  "description": "Offline face tracking with webcam",
+  "main": "server.js",
+  "scripts": {
+    "setup": "node setup-offline.js",
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2"
+  }
+}

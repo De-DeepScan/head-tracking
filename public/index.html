@@ -708,6 +708,13 @@
 
     async function init() {
       log('System initialization...', 'info');
+
+      // Vérifier si HTTPS ou localhost (requis pour la caméra)
+      if (location.protocol !== 'https:' && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1') {
+        log('WARNING: Camera requires HTTPS or localhost', 'warning');
+        log('Current: ' + location.protocol + '//' + location.hostname, 'warning');
+      }
+
       document.getElementById('mainStatus').textContent = 'LOADING NEURAL NETWORK...';
 
       await faceapi.nets.tinyFaceDetector.loadFromUri('/models');
@@ -775,6 +782,19 @@
       console.error(err);
       log('CRITICAL ERROR: ' + err.message, 'error');
       document.getElementById('mainStatus').textContent = 'ERROR';
+
+      // Messages d'aide selon l'erreur
+      if (err.name === 'NotAllowedError') {
+        log('Camera access denied - check browser permissions', 'error');
+      } else if (err.name === 'NotFoundError') {
+        log('No camera detected on this device', 'error');
+      } else if (err.name === 'NotReadableError') {
+        log('Camera is in use by another application', 'error');
+      } else if (err.name === 'OverconstrainedError') {
+        log('Camera does not support requested resolution', 'error');
+      } else if (location.protocol !== 'https:' && location.hostname !== 'localhost') {
+        log('HTTPS required - use localhost or enable HTTPS', 'error');
+      }
     });
   </script>
 </body>
